@@ -1,20 +1,20 @@
 import os
 import time
+import random
 
 if os.name == 'nt':
     import keyboard  # using module keyboard "pip install keyboard"
 elif os.name == 'posix':
-    import sys
-    import tty
     from pynput import keyboard
 
 
 # Global Variables
-snake_head_loc = [0, 0]
-snake_head_dir = [1, 0]
-cols, rows = (50, 10)
-playground = [[" " for i in range(cols)] for j in range(rows)]
-last_key_pressed = ""
+snake_body_parts = [[0, 0], [0, 1]]
+snake_head_dir = [1, 0]  # The snakes current direction of motion
+snake_food_loc = [1, 0]  # The grid location of the snakes next food piece
+cols, rows = (20, 10)  # The size of the map / playground
+playground = [[" " for i in range(cols)] for j in range(rows)]  # The playground 2d array
+last_key_pressed = ""  # The last key pressed on the keyboard
 
 
 # This function will center a string on a certain line in the window
@@ -62,20 +62,27 @@ def draw_main_menu(playground):
     print(screen)
 
 
-# Updates the game
-def update_game(playground):
-    # TODO: Update snakes head loc
-    # The snake itself might be a list of locations (row / col) i.e. head is index 0 at pos 5, 8
-    snake_head_loc[0] += snake_head_dir[0]
-    snake_head_loc[1] += snake_head_dir[1]
-
-
 # Clears the terminal for mac or windows os
 def ClearScreen():
     if os.name == 'nt':
         os.system('cls')
     elif os.name == 'posix':
         os.system('clear')
+
+
+# Updates the game
+def update_game(playground):
+    if (snake_body_parts[0][0] + snake_head_dir[0] == snake_food_loc[0]) and (snake_body_parts[0][1] + snake_head_dir[1] == snake_food_loc[1]):
+        new_food_position()
+        snake_body_parts.append([0, 0])
+
+    for i in range(len(snake_body_parts)-1, -1, -1):
+        if i == 0:
+            snake_body_parts[i][0] += snake_head_dir[0]
+            snake_body_parts[i][1] += snake_head_dir[1]
+        else:
+           snake_body_parts[i][0] = snake_body_parts[i - 1][0]
+           snake_body_parts[i][1] = snake_body_parts[i - 1][1]
 
 
 # Draws the game after it was updated
@@ -85,7 +92,11 @@ def draw_game(playground):
     ClearPlayground()
 
     # Draw the snakes head / body
-    playground[snake_head_loc[0]][snake_head_loc[1]] = '@'
+    for part in snake_body_parts:
+        playground[part[0]][part[1]] = '@'
+
+    # Draw the snakes food location
+    playground[snake_food_loc[0]][snake_food_loc[1]] = '¤'
 
     screen = ''
     for row in range(rows):
@@ -101,8 +112,28 @@ def should_play():
     while(True):
         if last_key_pressed in [121, 89, "y", "Y"]:  # (Y / y)
             return True
-        if last_key_pressed in [113, 81, "q", "Q", "esc"]:  # (Q / q)
+        if last_key_pressed in [113, 81, "q", "Q", "esc"]:  # (Q / q / escape)
             return False
+
+
+# Create a new random position for the snakes food
+def new_food_position():
+    # snake_food_loc[0] = random.randint(1, rows - 2)
+    # snake_food_loc[1] = random.randint(1, cols - 2)
+
+    new_loc = [random.randint(1, rows - 2), random.randint(1, cols - 2)]
+
+    # if the food is going to appear where the snakes head is about to go
+    if (snake_food_loc == new_loc):
+        new_food_position()
+        return
+
+    for part in snake_body_parts:
+        if part == new_loc:
+            new_food_position()
+            return
+    snake_food_loc[0] = new_loc[0]
+    snake_food_loc[1] = new_loc[1]
 
 
 # Called when a key is pressed
@@ -114,34 +145,19 @@ def on_press(key):
     except AttributeError:
         last_key_pressed = key.name
 
-    if last_key_pressed in ["left", ""]:
+    # Change the snakes position based off user input
+    if last_key_pressed in ["left", "a", "A"] and snake_head_dir[1] != 1:
         snake_head_dir = [0, -1]
-    elif last_key_pressed in ["right", ""]:
+    elif last_key_pressed in ["right", "d", "D"] and snake_head_dir[1] != -1:
         snake_head_dir = [0, 1]
-    elif last_key_pressed in ["up", ""]:
+    elif last_key_pressed in ["up", "w", "W"] and snake_head_dir[0] != 1:
         snake_head_dir = [-1, 0]
-    elif last_key_pressed in ["down", ""]:
+    elif last_key_pressed in ["down", "s", "S"] and snake_head_dir[0] != -1:
         snake_head_dir = [1, 0]
-
-    print(last_key_pressed)
-
-
-# Called when a key is released
-def on_release(key):
-    pass
-    # print('{0} released'.format(
-    #     key))
-    # if key == keyboard.Key.esc:
-    #     # Stop listener
-    #     return False
 
 
 # The main gameplay loop
 def main_gameplay_loop():
-    # For input on mac
-    if os.name == 'posix':
-        tty.setcbreak(sys.stdin)
-
     # Start by drawing the main menu
     draw_main_menu(playground)
 
@@ -151,8 +167,11 @@ def main_gameplay_loop():
         next_update = 0
 
         # Center the snake's head in the map
-        snake_head_loc[0] = round(rows / 2)  # row
-        snake_head_loc[1] = round(cols / 2)  # col
+        snake_body_parts[0][0] = round(rows / 2)  # row
+        snake_body_parts[0][1] = round(cols / 2)  # col
+
+        # Randomize the first piece of food
+        new_food_position()
 
         # Game Update Loop (every one second update)
         while (playing):
@@ -165,7 +184,7 @@ def main_gameplay_loop():
 # This is the entry point for the main script
 if __name__ == '__main__':
     # Collect keyboard events in a non-blocking fashion:
-    listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+    listener = keyboard.Listener(on_press=on_press)
     listener.start()
 
     # Run the main gameplay loop
