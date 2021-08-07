@@ -140,7 +140,8 @@ def draw_game(playground):
 
     # Draw the snakes head / body
     for part in snake_body_parts:
-        playground[part[0]][part[1]] = '@'
+        playground[part[0]][part[1]] = 'O'
+    playground[snake_body_parts[0][0]][snake_body_parts[0][1]] = '@'
 
     # Draw the snakes food location
     playground[snake_food_loc[0]][snake_food_loc[1]] = '¤'
@@ -228,11 +229,12 @@ def main_gameplay_loop():
         # Game Update Loop (every one second update)
         while (playing):
             if (time.time() > next_update):
-                next_update = time.time() + 1
+                next_update = time.time() + 0.75
                 update_game(playground)
                 draw_game(playground)
-    
+
     ClearScreen()
+
 
 # This is the entry point for the main script
 if __name__ == '__main__':
