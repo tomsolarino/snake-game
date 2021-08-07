@@ -1,12 +1,20 @@
 import os
-import keyboard  # using module keyboard
 import time
+
+if os.name == 'nt':
+    import keyboard  # using module keyboard "pip install keyboard"
+elif os.name == 'posix':
+    import sys
+    import tty
+    from pynput import keyboard
+
 
 # Global Variables
 snake_head_loc = [0, 0]
 snake_head_dir = [1, 0]
 cols, rows = (50, 10)
 playground = [[" " for i in range(cols)] for j in range(rows)]
+last_key_pressed = ""
 
 
 # This function will center a string on a certain line in the window
@@ -36,27 +44,9 @@ def ClearPlayground():
     playground[rows - 1][cols - 1] = "╝"
 
 
-# Draw the border around the map
-def DrawPlaygroundBorder(playground):
-    for row in range(rows):
-        playground[row][0] = "║"
-        playground[row][cols - 1] = "║"
-
-    for col in range(cols):
-        playground[0][col] = "═"
-        playground[rows - 1][col] = "═"
-
-    # Set border corners
-    playground[0][0] = "╔"
-    playground[0][cols - 1] = "╗"
-    playground[rows - 1][0] = "╚"
-    playground[rows - 1][cols - 1] = "╝"
-
-
 # This function will draw the main menu
 def draw_main_menu(playground):
-    os.system('cls')
-
+    ClearScreen()
     ClearPlayground()
 
     center_text(playground, 2, "SNAKE GAME")
@@ -76,12 +66,27 @@ def draw_main_menu(playground):
 def update_game(playground):
     # TODO: Update snakes head loc
     # The snake itself might be a list of locations (row / col) i.e. head is index 0 at pos 5, 8
-    playground[snake_head_loc[0]][snake_head_loc[1]] = '@'
+    snake_head_loc[0] += snake_head_dir[0]
+    snake_head_loc[1] += snake_head_dir[1]
+
+
+# Clears the terminal for mac or windows os
+def ClearScreen():
+    if os.name == 'nt':
+        os.system('cls')
+    elif os.name == 'posix':
+        os.system('clear')
 
 
 # Draws the game after it was updated
 def draw_game(playground):
-    os.system('cls')
+    # Clear the background and terminal before drawing the snake
+    ClearScreen()
+    ClearPlayground()
+
+    # Draw the snakes head / body
+    playground[snake_head_loc[0]][snake_head_loc[1]] = '@'
+
     screen = ''
     for row in range(rows):
         for col in range(cols):
@@ -91,21 +96,58 @@ def draw_game(playground):
 
 
 # Gets the players decision to play or not
+# Will wait until either 'y' or 'q' is clicked
 def should_play():
     while(True):
-        if keyboard.read_key() == "y":
+        if last_key_pressed in [121, 89, "y", "Y"]:  # (Y / y)
             return True
-        if keyboard.read_key() == "q":
+        if last_key_pressed in [113, 81, "q", "Q", "esc"]:  # (Q / q)
             return False
+
+
+# Called when a key is pressed
+def on_press(key):
+    global last_key_pressed
+    global snake_head_dir
+    try:
+        last_key_pressed = key.char
+    except AttributeError:
+        last_key_pressed = key.name
+
+    if last_key_pressed in ["left", ""]:
+        snake_head_dir = [0, -1]
+    elif last_key_pressed in ["right", ""]:
+        snake_head_dir = [0, 1]
+    elif last_key_pressed in ["up", ""]:
+        snake_head_dir = [-1, 0]
+    elif last_key_pressed in ["down", ""]:
+        snake_head_dir = [1, 0]
+
+    print(last_key_pressed)
+
+
+# Called when a key is released
+def on_release(key):
+    pass
+    # print('{0} released'.format(
+    #     key))
+    # if key == keyboard.Key.esc:
+    #     # Stop listener
+    #     return False
 
 
 # The main gameplay loop
 def main_gameplay_loop():
+    # For input on mac
+    if os.name == 'posix':
+        tty.setcbreak(sys.stdin)
+
+    # Start by drawing the main menu
     draw_main_menu(playground)
 
+    # Checks if the user want to play or not
     if should_play():
         playing = True
-        ClearPlayground()
         next_update = 0
 
         # Center the snake's head in the map
@@ -120,6 +162,14 @@ def main_gameplay_loop():
                 draw_game(playground)
 
 
-# Press the green button in the gutter to run the script.
+# This is the entry point for the main script
 if __name__ == '__main__':
+    # Collect keyboard events in a non-blocking fashion:
+    listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+    listener.start()
+
+    # Run the main gameplay loop
     main_gameplay_loop()
+
+    # Finally stop the keyboard listner
+    listener.stop()
